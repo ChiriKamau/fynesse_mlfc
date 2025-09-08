@@ -1,4 +1,4 @@
-%%capture
+
 %pip install osmnx
 
 import osmnx as ox
