@@ -1,106 +1,101 @@
-"""
-Address module for the fynesse framework.
+# ADDRESS: Create visualization to address spatial understanding needs
+fig, ax = plt.subplots(figsize=(6,6))
+area.plot(ax=ax, color="tan", alpha=0.5)
+buildings.plot(ax=ax, facecolor="gray", edgecolor="gray")
+edges.plot(ax=ax, linewidth=1, edgecolor="black", alpha=0.3)
+nodes.plot(ax=ax, color="black", markersize=1, alpha=0.3)
+pois.plot(ax=ax, color="green", markersize=5, alpha=1)
+ax.set_xlim(west, east)
+ax.set_ylim(south, north)
+ax.set_title(place_name, fontsize=14)
+plt.show()
 
-This module handles question addressing functionality including:
-- Statistical analysis
-- Predictive modeling
-- Data visualization for decision-making
-- Dashboard creation
-"""
+# ADDRESS: Create reusable feature extraction function
+features = [
+    ("building", None),
+    ("amenity", None),
+    ("amenity", "school"),
+    ("amenity", "hospital"),
+    ("amenity", "restaurant"),
+    ("amenity", "cafe"),
+    ("shop", None),
+    ("tourism", None),
+    ("tourism", "hotel"),
+    ("tourism", "museum"),
+    ("leisure", None),
+    ("leisure", "park"),
+    ("historic", None),
+    ("amenity", "place_of_worship"),
+]
 
-from typing import Any, Union
-import pandas as pd
-import logging
-
-# Set up logging
-logger = logging.getLogger(__name__)
-
-# Here are some of the imports we might expect
-# import sklearn.model_selection  as ms
-# import sklearn.linear_model as lm
-# import sklearn.svm as svm
-# import sklearn.naive_bayes as naive_bayes
-# import sklearn.tree as tree
-
-# import GPy
-# import torch
-# import tensorflow as tf
-
-# Or if it's a statistical analysis
-# import scipy.stats
-
-
-def analyze_data(data: Union[pd.DataFrame, Any]) -> dict[str, Any]:
+def get_feature_vector(latitude, longitude, box_size_km=2, features=features):
     """
-    Address a particular question that arises from the data.
-
-    IMPLEMENTATION GUIDE FOR STUDENTS:
-    ==================================
-
-    1. REPLACE THIS FUNCTION WITH YOUR ANALYSIS CODE:
-       - Perform statistical analysis on the data
-       - Create visualizations to explore patterns
-       - Build models to answer specific questions
-       - Generate insights and recommendations
-
-    2. ADD ERROR HANDLING:
-       - Check if input data is valid and sufficient
-       - Handle analysis failures gracefully
-       - Validate analysis results
-
-    3. ADD BASIC LOGGING:
-       - Log analysis steps and progress
-       - Log key findings and insights
-       - Log any issues encountered
-
-    4. EXAMPLE IMPLEMENTATION:
-       if data is None or len(data) == 0:
-           print("Error: No data available for analysis")
-           return {}
-
-       print("Starting data analysis...")
-       # Your analysis code here
-       results = {"sample_size": len(data), "analysis_complete": True}
-       return results
+    ADDRESS: Solution for extracting feature vectors from any location.
+    
+    Given a central point (latitude, longitude) and a bounding box size,
+    query OpenStreetMap via OSMnx and return a feature vector.
+    
+    Parameters
+    ----------
+    latitude : float
+        Latitude of the center point.
+    longitude : float
+        Longitude of the center point.
+    box_size_km : float
+        Size of the bounding box in kilometers
+    features : list of tuples
+        List of (key, value) pairs to count.
+        
+    Returns
+    -------
+    feature_vector : dict
+        Dictionary of feature counts, keyed by (key, value).
     """
-    logger.info("Starting data analysis")
+    # Convert box size to degrees (~111km per degree latitude)
+    box_deg = box_size_km / 111
+    north = latitude + box_deg / 2
+    south = latitude - box_deg / 2
+    east = longitude + box_deg / 2
+    west = longitude - box_deg / 2
+    bbox = (west, south, east, north)
+    
+    # Collect all unique keys needed
+    keys = {k for k, _ in features}
+    tags = {k: True for k in keys}
+    
+    # ACCESS data for this location
+    pois = ox.features_from_bbox(bbox, tags=tags)
+    
+    # ASSESS and count features
+    counts = {}
+    for key, value in features:
+        if key in pois.columns:
+            if value:
+                counts[f"{key}:{value}"] = (pois[key] == value).sum()
+            else:
+                counts[key] = pois[key].notnull().sum()
+        else:
+            counts[f"{key}:{value}" if value else key] = 0
+    
+    return counts
 
-    # Validate input data
-    if data is None:
-        logger.error("No data provided for analysis")
-        print("Error: No data available for analysis")
-        return {"error": "No data provided"}
+# ADDRESS: Define datasets for comparative analysis
+cities_kenya = {
+    "Nyeri, Kenya": {"latitude": -0.4371, "longitude": 36.9580},
+    "Nairobi, Kenya": {"latitude": -1.2921, "longitude": 36.8219},
+    "Mombasa, Kenya": {"latitude": -4.0435, "longitude": 39.6682},
+    "Kisumu, Kenya": {"latitude": -0.0917, "longitude": 34.7680}
+}
 
-    if len(data) == 0:
-        logger.error("Empty dataset provided for analysis")
-        print("Error: Empty dataset provided for analysis")
-        return {"error": "Empty dataset"}
+cities_england = {
+    "Cambridge, England": {"latitude": 52.2053, "longitude": 0.1218},
+    "London, England": {"latitude": 51.5072, "longitude": -0.1276},
+    "Sheffield, England": {"latitude": 53.3811, "longitude": -1.4701},
+    "Oxford, England": {"latitude": 51.7520, "longitude": -1.2577},
+}
 
-    logger.info(f"Analyzing data with {len(data)} rows, {len(data.columns)} columns")
-
-    try:
-        # STUDENT IMPLEMENTATION: Add your analysis code here
-
-        # Example: Basic data summary
-        results = {
-            "sample_size": len(data),
-            "columns": list(data.columns),
-            "data_types": data.dtypes.to_dict(),
-            "missing_values": data.isnull().sum().to_dict(),
-            "analysis_complete": True,
-        }
-
-        # Example: Basic statistics (students should customize this)
-        numeric_columns = data.select_dtypes(include=["number"]).columns
-        if len(numeric_columns) > 0:
-            results["numeric_summary"] = data[numeric_columns].describe().to_dict()
-
-        logger.info("Data analysis completed successfully")
-        print(f"Analysis completed. Sample size: {len(data)}")
-
-        return results
-
-    except Exception as e:
-        logger.error(f"Error during data analysis: {e}")
-        print(f"Error analyzing data: {e}")
-        return {"error": str(e)}
+# ADDRESS: Example usage of the solution
+print("\nExample feature vector extraction:")
+nyeri_features = get_feature_vector(latitude, longitude, box_size_km=2)
+for feature, count in nyeri_features.items():
+    print(f"{feature}: {count}")
